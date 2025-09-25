@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>词组配对游戏 - Turn Out</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .instructions {
+            background-color: #e8f4fd;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        @media (min-width: 768px) {
+            .game-area {
+                flex-direction: row;
+            }
+        }
+        .column {
+            flex: 1;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .sentence, .meaning {
+            padding: 12px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            cursor: grab;
+            transition: all 0.3s ease;
+        }
+        .sentence.dragging, .meaning.dragging {
+            opacity: 0.5;
+        }
+        .sentence.matched, .meaning.matched {
+            border-style: solid;
+            border-color: #4CAF50;
+            background-color: #e8f5e9;
+            cursor: default;
+        }
+        .sentence.incorrect, .meaning.incorrect {
+            border-color: #f44336;
+            background-color: #ffebee;
+        }
+        .match-feedback {
+            height: 20px;
+            text-align: center;
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .correct { color: #4CAF50; }
+        .incorrect-fb { color: #f44336; }
+        #resetBtn {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        #resetBtn:hover {
+            background-color: #0b7dda;
+        }
+        .completion-message {
+            text-align: center;
+            font-size: 1.2em;
+            color: #4CAF50;
+            font-weight: bold;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>词组配对游戏：Turn Out</h1>
+    <div class="instructions">
+        <p><strong>游戏说明：</strong>请将左侧的例句拖动到右侧相匹配的意思上。配对正确会出现 ✅，错误会出现 ❌。当所有配对都成功时，游戏完成！</p>
+    </div>
+
+    <div class="game-area">
+        <div class="column" id="sentencesColumn">
+            <h3>例句</h3>
+            <!-- 例句将由JavaScript动态生成 -->
+        </div>
+        <div class="column" id="meaningsColumn">
+            <h3>意思</h3>
+            <!-- 意思将由JavaScript动态生成 -->
+        </div>
+    </div>
+
+    <div class="completion-message" id="completionMessage">恭喜！所有配对都正确！</div>
+    <button id="resetBtn">重新开始游戏</button>
+
+    <script>
+        // 游戏数据 - 请确保这里的例句和意思与您提供的一致
+        const gameData = [
+            {
+                sentence: "The weather turned out to be nice after all.",
+                meaning: "结果是，原来是"
+            },
+            {
+                sentence: "Please turn out the lights before you leave.",
+                meaning: "关掉（电灯、电器等）"
+            },
+            {
+                sentence: "A large crowd turned out for the concert.",
+                meaning: "出席，到场"
+            },
+            {
+                sentence: "This factory can turn out 100 cars a day.",
+                meaning: "生产，制造"
+            },
+            {
+                sentence: "Remember to turn out your pockets before washing the jeans.",
+                meaning: "翻出，掏出"
+            }
+        ];
+
+        // 打乱数组顺序的函数
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // 初始化游戏
+        function initGame() {
+            const sentencesColumn = document.getElementById('sentencesColumn');
+            const meaningsColumn = document.getElementById('meaningsColumn');
+            
+            // 清空列内容（除了标题）
+            sentencesColumn.querySelectorAll('.sentence').forEach(el => el.remove());
+            meaningsColumn.querySelectorAll('.meaning').forEach(el => el.remove());
+            
+            // 打乱顺序
+            const shuffledSentences = shuffleArray([...gameData]);
+            const shuffledMeanings = shuffleArray([...gameData]);
+            
+            // 创建例句元素
+            shuffledSentences.forEach((item, index) => {
+                const sentenceEl = document.createElement('div');
+                sentenceEl.className = 'sentence';
+                sentenceEl.textContent = `${index + 1}. ${item.sentence}`;
+                sentenceEl.draggable = true;
+                sentenceEl.dataset.id = item.sentence; // 使用句子作为唯一标识
+                
+                sentenceEl.addEventListener('dragstart', handleDragStart);
+                sentencesColumn.appendChild(sentenceEl);
+                
+                // 添加反馈区域
+                const feedback = document.createElement('div');
+                feedback.className = 'match-feedback';
+                feedback.id = `feedback-${item.sentence}`;
+                sentencesColumn.appendChild(feedback);
+            });
+            
+            // 创建意思元素
+            shuffledMeanings.forEach((item, index) => {
+                const meaningEl = document.createElement('div');
+                meaningEl.className = 'meaning';
+                meaningEl.textContent = `${index + 1}. ${item.meaning}`;
+                meaningEl.dataset.id = item.sentence; // 使用对应的句子作为标识，用于匹配
+                
+                meaningEl.addEventListener('dragover', handleDragOver);
+                meaningEl.addEventListener('drop', handleDrop);
+                meaningsColumn.appendChild(meaningEl);
+            });
+            
+            // 隐藏完成消息
+            document.getElementById('completionMessage').style.display = 'none';
+        }
+
+        // 拖放功能
+        let draggedElement = null;
+
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        }
+
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            e.dataTransfer.dropEffect = 'move';
+            return false;
+        }
+
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            if (draggedElement.dataset.id === this.dataset.id) {
+                // 匹配正确
+                draggedElement.classList.add('matched');
+                this.classList.add('matched');
+                
+                // 显示正确反馈
+                const feedbackEl = document.getElementById(`feedback-${draggedElement.dataset.id}`);
+                feedbackEl.textContent = '✅ 正确！';
+                feedbackEl.className = 'match-feedback correct';
+                
+                // 检查游戏是否完成
+                checkGameCompletion();
+            } else {
+                // 匹配错误
+                draggedElement.classList.add('incorrect');
+                this.classList.add('incorrect');
+                
+                // 显示错误反馈
+                const feedbackEl = document.getElementById(`feedback-${draggedElement.dataset.id}`);
+                feedbackEl.textContent = '❌ 再试试！';
+                feedbackEl.className = 'match-feedback incorrect-fb';
+                
+                // 一段时间后移除错误样式
+                setTimeout(() => {
+                    draggedElement.classList.remove('incorrect');
+                    this.classList.remove('incorrect');
+                    feedbackEl.textContent = '';
+                }, 1000);
+            }
+            
+            draggedElement.classList.remove('dragging');
+            return false;
+        }
+
+        // 检查游戏是否完成
+        function checkGameCompletion() {
+            const matchedSentences = document.querySelectorAll('.sentence.matched');
+            if (matchedSentences.length === gameData.length) {
+                document.getElementById('completionMessage').style.display = 'block';
+            }
+        }
+
+        // 重置游戏
+        document.getElementById('resetBtn').addEventListener('click', initGame);
+
+        // 页面加载时初始化游戏
+        window.onload = initGame;
+    </script>
+</body>
+</html>
